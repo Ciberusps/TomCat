@@ -37,7 +37,7 @@ public class MicControlC : MonoBehaviour
         StartMicrophone();
     }
 
-    void OnGUI()
+    /*void OnGUI()
     {
         MicDeviceGUI((Screen.width / 2) - 150, (Screen.height / 2) - 75, 300, 100, 10, -300);
         if (Microphone.IsRecording(selectedDevice))
@@ -45,9 +45,10 @@ public class MicControlC : MonoBehaviour
             ramFlushTimer += Time.fixedDeltaTime;
             RamFlush();
         }
-    }
+    }*/
 
-    public void MicDeviceGUI(float left, float top, float width, float height, float buttonSpaceTop, float buttonSpaceLeft)
+
+    /*public void MicDeviceGUI(float left, float top, float width, float height, float buttonSpaceTop, float buttonSpaceLeft)
     {
         if (Microphone.devices.Length > 1 && GuiSelectDevice == true || micSelected == false)//If there is more than one device, choose one.
             for (int i = 0; i < Microphone.devices.Length; ++i)
@@ -65,7 +66,7 @@ public class MicControlC : MonoBehaviour
             GetMicCaps();
             micSelected = true;
         }
-    }
+    }*/
 
     public void GetMicCaps()
     {
@@ -89,13 +90,7 @@ public class MicControlC : MonoBehaviour
 
     void Update()
     {
-//        print("AudioVolume: " + audio.volume);
         audio.volume = (sourceVolume / 100);
-
-/*        print("AveragedVolume: " + GetAveragedVolume());
-        print("SourceVolume: " + sourceVolume);
-        print("SourceVolume/10: " + sourceVolume/10);*/
-
         loudness = GetAveragedVolume() * sensitivity * (sourceVolume / 10);
         //Hold To Speak!!
         /*if (micControl == micActivation.HoldToSpeak)
@@ -130,10 +125,10 @@ public class MicControlC : MonoBehaviour
         //
         if (Input.GetKeyDown(KeyCode.G))
             micSelected = false;*/
-        
+
     }
 
-    private void RamFlush()
+    /*private void RamFlush()
     {
         if (ramFlushTimer >= ramFlushSpeed && Microphone.IsRecording(selectedDevice))
         {
@@ -141,25 +136,30 @@ public class MicControlC : MonoBehaviour
             StartMicrophone();
             ramFlushTimer = 0;
         }
-    }
+    }*/
 
     float GetAveragedVolume()
     {
-        float[] data = new float[amountSamples-1];
+        float[] data = new float[amountSamples];
 
         float a = 0;
 
         audio.GetOutputData(data, 0);
 
-
-        foreach (float s in data)
+        /*foreach (float s in data)
         {
-            print("S: " + s);
             a += Mathf.Abs(s);
-        }
+        }*/
 
-        print("End A: " + a);
-        
+        for (int i = 0; i < data.Length - 1; i++)
+        {
+            /*if (data[i] == 0)
+                print("S: " + i);
+                */
+            a += Mathf.Abs(data[i]);
+        }
+        //print("End A: " + a);
+
         return a / amountSamples;
     }
 }

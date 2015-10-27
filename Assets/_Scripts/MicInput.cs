@@ -45,8 +45,6 @@ public class MicInput : MonoBehaviour
         return levelMax;
     }
 
-
-
     void Update()
     {
         // levelMax equals to the highest normalized value power 2, a small number because < 1

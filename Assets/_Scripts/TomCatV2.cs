@@ -1,21 +1,38 @@
 ﻿using UnityEngine;
 using System.Collections;
+using UnityEngine.UI;
 
 [RequireComponent(typeof(AudioSource))]
 public class TomCatV2 : MonoBehaviour
 {
-    public GameObject audioInputObject;
+    public enum InputVoice
+    {
+        buttons,
+        onUpdate
+    }
+
+    // public GameObject audioInputObject;
+
+    public InputVoice inputVoice = InputVoice.buttons;
     public float startRecordThreshold = 1F;
     public float endRecordThreshold = 1F;
     public Vector2 pitchSlowBound;
     public Vector2 pitchFastBound;
-
-    //    private MicrophoneInput _micIn;
+    [Range(0, 100)]
+    public float sourceVolume = 100;
     public MicControlC micCon;
+    public float sensitivity = 100;
+    public Image visualization;
+
+    //public AudioClip waitForMicroClip;
+    //public AudioClip micro;
 
     private bool _recordVoice = false;
-    private float l;
     private bool _stopRecord = false;
+    private float loudness;
+    private int amountSamples = 256; //increase to get better average, but will decrease performance. Best to leave it
+
+
     void Start()
     {
         /*if (audioInputObject != null)
@@ -24,51 +41,50 @@ public class TomCatV2 : MonoBehaviour
 
     void Update()
     {
-        /* if (!_recordVoice)
-         {
-             float l = _micIn.loudness;
-
-             if (l > startRecordThreshold)
-             {
-                 _StartVoiceRecord();
-             }
-         }
-         else
-         {
-             float l = _micIn.loudness;
-
-             if (l < endRecordThreshold)
-             {
-                 _EndVoiceRecord();
-             }
-         }*/
-
-
-        l = micCon.loudness;
-
-
-        if (!_stopRecord)
+        if (inputVoice == InputVoice.buttons)
         {
+            loudness = micCon.loudness;
+        }
+        else
+        {
+            audio.volume = (sourceVolume / 100);
+            //l = MicInput.MicLoudness;
+            //l = MicrophoneInput1.instance.loudness;
+
             if (!_recordVoice)
             {
-                if (l > startRecordThreshold)
-                    _StartVoiceRecord();
+                loudness = micCon.loudness;
             }
-            else
+            else if (_recordVoice)
             {
-                if (l < endRecordThreshold)
-                    _EndVoiceRecord();
+                loudness = GetAveragedVolume() * sensitivity * (sourceVolume / 10);
+            }
+
+            if (!_stopRecord)
+            {
+                if (!_recordVoice)
+                {
+                    if (loudness > startRecordThreshold)
+                        _StartVoiceRecord();
+                }
+                else
+                {
+                    if (loudness < endRecordThreshold)
+                        _EndVoiceRecord();
+                }
             }
         }
-        
 
-        print(l);
+        print(loudness);
     }
 
     public void _StartVoiceRecord()
     {
         _recordVoice = true;
-        audio.clip = Microphone.Start(null, false, 30, 44100);
+
+        //Microphone.End(null);
+        audio.clip = Microphone.Start(null, false, 30, 16000);
+        visualization.color = Color.red;
 
         Debug.LogWarning("StartRecord " + micCon.loudness);
     }
@@ -78,9 +94,11 @@ public class TomCatV2 : MonoBehaviour
         _recordVoice = false;
         Microphone.End(null);
 
-        Debug.LogWarning("EndRecord " + micCon.loudness);
-
+        //Debug.LogWarning("EndRecord " + micCon.loudness);
+        Debug.LogWarning("EndRecord: " + loudness);
         _stopRecord = true;
+        visualization.color = Color.white;
+
 
         _HandleSound();
         Play();
@@ -105,6 +123,31 @@ public class TomCatV2 : MonoBehaviour
     public void RestartMicroRecord()
     {
         micCon.StartMicrophone();
+
+        //MicrophoneInput1.instance.Restart();
         _stopRecord = false;
+    }
+
+    float GetAveragedVolume()
+    {
+        float[] data = new float[amountSamples];
+        float a = 0;
+
+        audio.GetOutputData(data, 0);
+        /*foreach (float s in data)
+        {
+            a += Mathf.Abs(s);
+        }*/
+
+        for (int i = 0; i < data.Length - 1; i++)
+        {
+            /*if (data[i] == 0)
+                print("S: " + i);
+                */
+            a += Mathf.Abs(data[i]);
+        }
+        if (a == 0)
+            print("End A: " + a);
+        return a / amountSamples;
     }
 }

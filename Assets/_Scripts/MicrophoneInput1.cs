@@ -2,25 +2,32 @@
 using System.Collections;
 
 [RequireComponent(typeof(AudioSource))]
-public class MicrophoneInput2 : MonoBehaviour
+public class MicrophoneInput1 : MonoBehaviour
 {
+    public static MicrophoneInput1 instance;
+
     public float sensitivity = 100;
     public float loudness = 0;
 
-	// Use this for initialization
-	void Start ()
-	{
-	    audio.clip = Microphone.Start(null, true, 10, 44100);
-	    audio.loop = true;
+    // Use this for initialization
+    void Start()
+    {
+        
+    }
+
+    public void Restart()
+    {
+        audio.clip = Microphone.Start(null, true, 10, 44100);
+        audio.loop = true;
         audio.mute = true;
         while (!(Microphone.GetPosition(null) > 0))
-        audio.Play();
+            audio.Play();
     }
 
     // Update is called once per frame
-    void Update ()
+    void Update()
     {
-        loudness = GetAveragedVolume()*sensitivity;
+        loudness = GetAveragedVolume() * sensitivity;
     }
 
     float GetAveragedVolume()
@@ -34,6 +41,16 @@ public class MicrophoneInput2 : MonoBehaviour
             a += Mathf.Abs(data[i]);
         }
 
-        return a/256;
+        return a / 256;
+    }
+
+    void OnEnable()
+    {
+        instance = this;
+    }
+
+    void OnDisable()
+    {
+        instance = null;
     }
 }
