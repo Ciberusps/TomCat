@@ -25,7 +25,7 @@ public class TomCat : MonoBehaviour
         _microphoneDevices = Microphone.devices;
 
         _CheckMicrophone();
-        _waitForVoiceClip = Microphone.Start(null, true, waitingForVoiceTime, _maxFreq);
+        _waitForVoiceClip = Microphone.Start(null, true, waitingForVoiceTime, 44100);
 
 
         _HandleSound();
@@ -89,7 +89,7 @@ public class TomCat : MonoBehaviour
         }
         else
         {
-            _voice = Microphone.Start(null, true, lengthOfRecord, _maxFreq);
+//            _voice = Microphone.Start(null, true, lengthOfRecord, 44100);
         }
     }
 }
