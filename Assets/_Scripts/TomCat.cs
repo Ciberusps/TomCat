@@ -10,7 +10,7 @@ public class TomCat : MonoBehaviour
     public int lengthOfRecord;
 
     private AudioSource _audioSource;
-    private AudioClip _voice;
+//    private AudioClip _voice;
     private AudioClip _waitForVoiceClip;
     private string[] _microphoneDevices;
     private bool _microConnected;
@@ -30,7 +30,7 @@ public class TomCat : MonoBehaviour
 
         _HandleSound();
 
-        _audioSource.clip = _voice;
+//        _audioSource.clip = _voice;
         _audioSource.clip = sample;
 
         PlaySound();
