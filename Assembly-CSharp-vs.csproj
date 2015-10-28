@@ -19,7 +19,7 @@
 	<DebugType>full</DebugType>
 	<Optimize>false</Optimize>
 	<OutputPath>Temp\bin\Debug\</OutputPath>
-	<DefineConstants>DEBUG;TRACE;UNITY_4_6_1;UNITY_4_6;UNITY_ANDROID;ENABLE_MICROPHONE;ENABLE_TEXTUREID_MAP;ENABLE_UNITYEVENTS;ENABLE_NEW_HIERARCHY ;ENABLE_AUDIO_FMOD;ENABLE_MONO;ENABLE_TERRAIN;ENABLE_SUBSTANCE;ENABLE_GENERICS;INCLUDE_WP8SUPPORT;ENABLE_WWW;ENABLE_IMAGEEFFECTS;ENABLE_4_6_FEATURES;INCLUDE_WP_BLUE_SUPPORT;ENABLE_WEBCAM;INCLUDE_METROSUPPORT;RENDER_SOFTWARE_CURSOR;ENABLE_NETWORK;ENABLE_PHYSICS;ENABLE_CACHING;ENABLE_CLOTH;UNITY_ANDROID_API;ENABLE_2D_PHYSICS;ENABLE_SHADOWS;ENABLE_AUDIO;ENABLE_NAVMESH_CARVING;ENABLE_SINGLE_INSTANCE_BUILD_SETTING;ENABLE_PROFILER;UNITY_EDITOR;UNITY_EDITOR_WIN</DefineConstants>
+	<DefineConstants>DEBUG;TRACE;UNITY_4_6_7;UNITY_4_6;UNITY_ANDROID;ENABLE_MICROPHONE;ENABLE_TEXTUREID_MAP;ENABLE_UNITYEVENTS;ENABLE_NEW_HIERARCHY ;ENABLE_AUDIO_FMOD;ENABLE_TERRAIN;ENABLE_SUBSTANCE;ENABLE_GENERICS;INCLUDE_IL2CPP;INCLUDE_WP8SUPPORT;ENABLE_WWW;ENABLE_IMAGEEFFECTS;ENABLE_4_6_FEATURES;INCLUDE_WP_BLUE_SUPPORT;ENABLE_WEBCAM;INCLUDE_METROSUPPORT;RENDER_SOFTWARE_CURSOR;ENABLE_NETWORK;ENABLE_PHYSICS;UNITY5_SCRIPTING_IN_UNITY4;ENABLE_CACHING;ENABLE_CLOTH;UNITY_ANDROID_API;ENABLE_2D_PHYSICS;ENABLE_SHADOWS;ENABLE_AUDIO;ENABLE_NAVMESH_CARVING;ENABLE_SINGLE_INSTANCE_BUILD_SETTING;ENABLE_MONO;DEVELOPMENT_BUILD;ENABLE_PROFILER;UNITY_EDITOR;UNITY_EDITOR_WIN;UNITY_TEAM_LICENSE;UNITY_PRO_LICENSE</DefineConstants>
 	<ErrorReport>prompt</ErrorReport>
 	<WarningLevel>4</WarningLevel>
 	<NoWarn>0169</NoWarn>
@@ -46,6 +46,21 @@
 	</Reference>
   </ItemGroup>
   <ItemGroup>
+     <Compile Include="Assets\Opencoding\Console\Demo\AttachToScreenEdge.cs" />
+     <Compile Include="Assets\Opencoding\Console\Demo\BallGameController.cs" />
+     <Compile Include="Assets\Opencoding\Console\Demo\BallGameGameOverUI.cs" />
+     <Compile Include="Assets\Opencoding\Console\Demo\BallGameGeneralCommandHandlers.cs" />
+     <Compile Include="Assets\Opencoding\Console\Demo\BallGameHUD.cs" />
+     <Compile Include="Assets\Opencoding\Console\Demo\BallSpawner.cs" />
+     <Compile Include="Assets\Opencoding\Console\Demo\BallgameSaveSystem.cs" />
+     <Compile Include="Assets\Opencoding\Console\Demo\CommandSecurity\CommandSecurityPopup.cs" />
+     <Compile Include="Assets\Opencoding\Console\Demo\CommandSecurity\ConsoleCommandSecurity.cs" />
+     <Compile Include="Assets\Opencoding\Console\Demo\CommandSecurity\ExampleCommands.cs" />
+     <Compile Include="Assets\Opencoding\Console\Demo\CommandSecurity\SecureCommandHandlerAttribute.cs" />
+     <Compile Include="Assets\Opencoding\Console\Demo\ConsoleOutputTest.cs" />
+     <Compile Include="Assets\Opencoding\Console\Demo\DemoBall.cs" />
+     <Compile Include="Assets\Opencoding\Console\Demo\DemoController.cs" />
+     <Compile Include="Assets\Opencoding\Console\NativeMethods.cs" />
      <Compile Include="Assets\Reporter\MultiKeyDictionary.cs" />
      <Compile Include="Assets\Reporter\Reporter.cs" />
      <Compile Include="Assets\Reporter\ReporterGUI.cs" />
@@ -58,9 +73,25 @@
      <Compile Include="Assets\_Scripts\SingleMicrophoneCapture.cs" />
      <Compile Include="Assets\_Scripts\TomCat.cs" />
      <Compile Include="Assets\_Scripts\TomCatV2.cs" />
+     <None Include="Assets\Opencoding\Console\EmailTemplates\LogEmailHeader.txt" />
+     <None Include="Assets\link.xml" />
      <None Include="Assets\StreamingAssets\build_info.txt" />
+     <None Include="Assets\Opencoding\Console\EmailTemplates\LogEmailFooter.txt" />
+     <None Include="Assets\Opencoding\Console\readme.txt" />
  <Reference Include="UnityEngine.UI">
- <HintPath>C:/Program Files (x86)/Unity/Editor/Data/UnityExtensions/Unity/GUISystem/4.6.1/UnityEngine.UI.dll</HintPath>
+ <HintPath>C:/Program Files (x86)/Unity/Editor/Data/UnityExtensions/Unity/GUISystem/4.6.7/Standalone/UnityEngine.UI.dll</HintPath>
+ </Reference>
+ <Reference Include="Opencoding.CommandHandlers">
+ <HintPath>H:/GIT/TomCat/Assets/Opencoding/DLLs/Opencoding.CommandHandlers.dll</HintPath>
+ </Reference>
+ <Reference Include="Opencoding.Console">
+ <HintPath>H:/GIT/TomCat/Assets/Opencoding/DLLs/Opencoding.Console.dll</HintPath>
+ </Reference>
+ <Reference Include="Opencoding.LogHistory">
+ <HintPath>H:/GIT/TomCat/Assets/Opencoding/DLLs/Opencoding.LogHistory.dll</HintPath>
+ </Reference>
+ <Reference Include="Opencoding.Shared">
+ <HintPath>H:/GIT/TomCat/Assets/Opencoding/DLLs/Opencoding.Shared.dll</HintPath>
  </Reference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

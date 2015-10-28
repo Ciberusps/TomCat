@@ -31,7 +31,7 @@ public class TomCatV2 : MonoBehaviour
     private bool _stopRecord = false;
     private float loudness;
     private int amountSamples = 256; //increase to get better average, but will decrease performance. Best to leave it
-
+    private string _logString;
 
     void Start()
     {
@@ -43,11 +43,17 @@ public class TomCatV2 : MonoBehaviour
     {
         if (inputVoice == InputVoice.buttons)
         {
-            loudness = micCon.loudness;
+            if (!_recordVoice)
+                loudness = micCon.loudness;
+            else if (_recordVoice)
+            {
+                audio.volume = (sourceVolume / 100);
+                loudness = GetAveragedVolume() * sensitivity * (sourceVolume / 10);
+            }
         }
-        else
+        else if (inputVoice == InputVoice.onUpdate)
         {
-            audio.volume = (sourceVolume / 100);
+            //            audio.volume = (sourceVolume / 100);
             //l = MicInput.MicLoudness;
             //l = MicrophoneInput1.instance.loudness;
 
@@ -57,36 +63,76 @@ public class TomCatV2 : MonoBehaviour
             }
             else if (_recordVoice)
             {
+                audio.volume = (sourceVolume / 100);
                 loudness = GetAveragedVolume() * sensitivity * (sourceVolume / 10);
             }
 
-            if (!_stopRecord)
-            {
+            /*if (!_stopRecord)
+            {*/
                 if (!_recordVoice)
                 {
-                    if (loudness > startRecordThreshold)
+                    if (loudness != 0 && loudness > startRecordThreshold)
                         _StartVoiceRecord();
                 }
                 else
                 {
-                    if (loudness < endRecordThreshold)
+                    if (loudness != 0 && loudness < endRecordThreshold)
                         _EndVoiceRecord();
                 }
-            }
+//            }
         }
+    }
 
-        print(loudness);
+    void OnGUI()
+    {
+        /*_logString = "Average volume : " + GetAveragedVolume()
+                 + "\nSensitivity: " + sensitivity
+                 + "\nSource volume / 10: " + (sourceVolume / 10);*/
+
+        _logString = "Loudness: " + loudness;
+        GUI.TextArea(new Rect(10, 10, 180, 300), _logString);
     }
 
     public void _StartVoiceRecord()
     {
-        _recordVoice = true;
+        /*if (inputVoice == InputVoice.buttons)
+        {*/
 
-        //Microphone.End(null);
-        audio.clip = Microphone.Start(null, false, 30, 16000);
+
+        /*_recordVoice = true;
+        Microphone.End(null);
+
+        audio.mute = true;
+        audio.clip = Microphone.Start(null, false, 30, 44100);
         visualization.color = Color.red;
 
-        Debug.LogWarning("StartRecord " + micCon.loudness);
+        Debug.LogWarning("StartRecord " + loudness);
+        */
+
+
+        _recordVoice = true;
+        Microphone.End(null);
+
+        audio.clip = Microphone.Start(null, false, 10, 44100);//Starts recording
+        while (!(Microphone.GetPosition(null) > 0)) { } // Wait until the recording has started
+        audio.mute = true;
+        audio.Play(); // Play the audio source!
+        visualization.color = Color.red;
+
+        Debug.LogWarning("StartRecord " + loudness);
+
+        /*}
+        else
+        {
+            _recordVoice = true;
+            audio.mute = true;
+
+            Microphone.End(null);
+            audio.clip = Microphone.Start(null, false, 30, 44100);
+            visualization.color = Color.red;
+
+            Debug.LogWarning("StartRecord " + loudness);
+        }*/
     }
 
     public void _EndVoiceRecord()
@@ -98,7 +144,7 @@ public class TomCatV2 : MonoBehaviour
         Debug.LogWarning("EndRecord: " + loudness);
         _stopRecord = true;
         visualization.color = Color.white;
-
+        audio.Stop();
 
         _HandleSound();
         Play();
@@ -106,14 +152,16 @@ public class TomCatV2 : MonoBehaviour
 
     public void Play()
     {
+        audio.mute = false;
         audio.Play();
         audio.loop = false;
+
         Debug.LogWarning("play " + micCon.loudness);
     }
 
     private void _HandleSound()
     {
-        var randNum = Random.Range(0, 2);
+        var randNum = Random.Range(0, 10) > 5 ? 0 : 1;
         audio.pitch =
             randNum == 0
                 ? Random.Range((float)pitchSlowBound.x, pitchSlowBound.y)
@@ -146,8 +194,8 @@ public class TomCatV2 : MonoBehaviour
                 */
             a += Mathf.Abs(data[i]);
         }
-        if (a == 0)
-            print("End A: " + a);
+        /*if (a == 0)
+            print("End A: " + a);*/
         return a / amountSamples;
     }
 }

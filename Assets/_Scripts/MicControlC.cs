@@ -26,11 +26,12 @@ public class MicControlC : MonoBehaviour
     private float ramFlushTimer;
     private int amountSamples = 256; //increase to get better average, but will decrease performance. Best to leave it
     private int minFreq, maxFreq;
+    private string _logString;
 
     void Start()
     {
         audio.loop = true; // Set the AudioClip to loop
-        audio.mute = false; // Mute the sound, we don't want the player to hear it
+        audio.mute = true; // Mute the sound, we don't want the player to hear it
         selectedDevice = Microphone.devices[0].ToString();
         micSelected = true;
         GetMicCaps();
@@ -46,7 +47,6 @@ public class MicControlC : MonoBehaviour
             RamFlush();
         }
     }*/
-
 
     /*public void MicDeviceGUI(float left, float top, float width, float height, float buttonSpaceTop, float buttonSpaceLeft)
     {
@@ -79,6 +79,7 @@ public class MicControlC : MonoBehaviour
     {
         audio.clip = Microphone.Start(selectedDevice, true, 10, maxFreq);//Starts recording
         while (!(Microphone.GetPosition(selectedDevice) > 0)) { } // Wait until the recording has started
+        audio.mute = true;
         audio.Play(); // Play the audio source!
     }
 
@@ -88,10 +89,21 @@ public class MicControlC : MonoBehaviour
         Microphone.End(selectedDevice);//Stops the recording of the device	
     }
 
+   /* void OnGUI()
+    {
+        _logString = "Average volume : " + GetAveragedVolume()
+                 + "\nSensitivity: " + sensitivity
+                 + "\nSource volume / 10: " + (sourceVolume / 10);
+        if (audio.isPlaying)
+            GUI.TextArea(new Rect(10, 10, 180, 300), _logString);
+    }*/
+
     void Update()
     {
         audio.volume = (sourceVolume / 100);
         loudness = GetAveragedVolume() * sensitivity * (sourceVolume / 10);
+        /*if (loudness == 0)
+            Debug.LogError("Loudness " + loudness);*/
         //Hold To Speak!!
         /*if (micControl == micActivation.HoldToSpeak)
         {
