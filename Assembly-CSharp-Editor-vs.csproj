@@ -154,7 +154,6 @@
      <Compile Include="Assets\Opencoding\Console\Editor\DebugConsoleInspector.cs" />
      <Compile Include="Assets\Opencoding\Console\Editor\DetectUpgrade.cs" />
      <Compile Include="Assets\Opencoding\Console\Editor\Unity5_2Workaround.cs" />
-     <Compile Include="Assets\Reporter\Editor\ReporterEditor.cs" />
      <None Include="Assets\NGUI\Examples\Shaders\Unlit - Depth Cutout.shader" />
      <None Include="Assets\NGUI\ReadMe - 3.9.0.txt" />
      <None Include="Assets\NGUI\Resources\Shaders\Unlit - Transparent Masked 1.shader" />

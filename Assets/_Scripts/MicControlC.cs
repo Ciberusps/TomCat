@@ -77,6 +77,7 @@ public class MicControlC : MonoBehaviour
 
     public void StartMicrophone()
     {
+        audio.loop = true; // Set the AudioClip to loop
         audio.clip = Microphone.Start(selectedDevice, true, 10, maxFreq);//Starts recording
         while (!(Microphone.GetPosition(selectedDevice) > 0)) { } // Wait until the recording has started
         audio.mute = true;
