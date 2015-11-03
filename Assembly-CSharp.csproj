@@ -198,6 +198,7 @@
      <Compile Include="Assets\Opencoding\Console\Demo\DemoBall.cs" />
      <Compile Include="Assets\Opencoding\Console\Demo\DemoController.cs" />
      <Compile Include="Assets\Opencoding\Console\NativeMethods.cs" />
+     <Compile Include="Assets\TestReversePlaying.cs" />
      <Compile Include="Assets\_Scripts\ExtensionMethods.cs" />
      <Compile Include="Assets\_Scripts\MicControlC.cs" />
      <Compile Include="Assets\_Scripts\MicInput.cs" />
@@ -206,6 +207,7 @@
      <Compile Include="Assets\_Scripts\TomCat.cs" />
      <Compile Include="Assets\_Scripts\TomCatV2.cs" />
      <Compile Include="Assets\_Scripts\TomCatV3.cs" />
+     <Compile Include="Assets\_Scripts\UIRadioGroup.cs" />
      <None Include="Assets\NGUI\Examples\Shaders\Unlit - Depth Cutout.shader" />
      <None Include="Assets\NGUI\ReadMe - 3.9.0.txt" />
      <None Include="Assets\NGUI\Resources\Shaders\Unlit - Transparent Masked 1.shader" />

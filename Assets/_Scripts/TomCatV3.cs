@@ -1,7 +1,11 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Threading;
 using UnityEngine.UI;
+using Random = UnityEngine.Random;
 
 [RequireComponent(typeof(AudioSource))]
 public class TomCatV3 : MonoBehaviour
@@ -18,10 +22,19 @@ public class TomCatV3 : MonoBehaviour
         byStartAndEndMicro
     }
 
+    public enum VoiceHandle
+    {
+        onlyRandPitch,
+        reversePlaying,
+        withFunnyMoments
+    }
+
     public InputVoice inputVoice = InputVoice.buttons;
     public Record recordType = Record.byStartAndEndMicro;
-    public float startRecordThreshold = 1F;
-    public float endRecordThreshold = 1F;
+    public VoiceHandle voiceHandle = VoiceHandle.onlyRandPitch;
+    public float startRecordThreshold = 100F;
+    public float endRecordThreshold = 40F;
+    public float funnyMomentTreshold;
     public Vector2 pitchSlowBound;
     public Vector2 pitchFastBound;
     [Range(0, 100)]
@@ -33,22 +46,28 @@ public class TomCatV3 : MonoBehaviour
     public int voiceClipLength = 10;
     public int numOfSamplesBeforeStart;
     public int numOfSamplesAfterEnd;
+    public int numOfGetSamplesForAvLoudness;
     public float notEndRecordTime = 0.5F;
     public float notRecordingTime = 0.3F;
+    public float funnyMomentTime = 0.1F;
     public bool onlyFunnyVoice = true;
     public UISprite visualization;
+    public List<AudioClip> funnyMoments;
 
     public AudioSource micro;
     public AudioSource voice;
     public AudioSource finished;
     public AudioSource samplesBeforeStart;
+    public AudioSource funnyMoment;
     public UILabel startTresholdLabel;
     public UILabel endTresholdLabel;
+    public UIToggle playReverseToggle;
+    public UIToggle withFunnyMomentsToggle;
 
-    //    private AudioClip samplesBeforeStart;
     private AudioClip _samplesAfterEnd;
+    private AudioClip _avLoudness;
     private bool _recordVoice = false;
-    private float loudness;
+    private float _loudness;
     private int amountSamples = 256; //increase to get better average, but will decrease performance. Best to leave it
     private string _MicroLogString;
     private string _RecordLogString;
@@ -59,31 +78,22 @@ public class TomCatV3 : MonoBehaviour
     private int _lastSample = 0;
     private int _voiceOffSet = 0;
     private int _micSamples;
-    private int _lastMicPos;
+    private int _micPosOnStartRecord;
     private float _voiceStartTime;
     private float _voiceEndTime;
     private int _numOfClips;
     private int _voiceLength;
     private int _micPos;
-    private float _averageLoudnessOfRecord;
     private int _loudnessGetCount;
-    private float _rmsValue;
-    private const float REFVALUE = 0.1f;
-    private float _dbValue = 0;
     private float _notEndRecordTimer = 0;
-    private float _samplesBeforeStartTime;
-    private int _lastSampleBeforeVoice = 0;
-    private int _samplesBeforeStartVoiceOffSet = 0;
-    private bool _recordSamplesBeforeStart = false;
-    private int _lastMicPosBeforeStart = 0;
     private float _notRecordingTimer = 0;
     private bool _notRecording = false;
-
-    void Start()
-    {
-
-    }
-
+    private float _randPitch;
+    private float _averageLoudness = 0;
+    private int _countOfGetLoudness = 0;
+    private int _lastMicPos = 0;
+    private bool _funnyMomentTime = false;
+    private float _funnyMomentTimer;
     public void GetMicCaps()
     {
         Microphone.GetDeviceCaps(null, out _minFreq, out _maxFreq);//Gets the frequency of the device
@@ -99,19 +109,9 @@ public class TomCatV3 : MonoBehaviour
         micro.mute = true;
         micro.Play(); // Play the audio source!
 
-        //        samplesBeforeStart.clip = AudioClip.Create("SamplesBeforeStart_" + _numOfClips, numOfSamplesBeforeStart * micro.clip.channels, micro.clip.channels, _maxFreq, false, false);
+
 
         _micSamples = micro.clip.samples * micro.clip.channels;
-    }
-
-    void Update()
-    {
-        /*if (!_recordVoice)
-            micro.volume = (sourceVolume / 100);
-        else
-            voice.volume = (sourceVolume / 100);
-
-        loudness = GetAveragedVolume() * sensitivity * (sourceVolume / 10);*/
     }
 
     private void FixedUpdate()
@@ -120,19 +120,28 @@ public class TomCatV3 : MonoBehaviour
         {
             GetMicCaps();
             StartMicro();
-
+            voiceHandle = VoiceHandle.onlyRandPitch;
         }
+
+        _micPos = Microphone.GetPosition(null);
+
 
         if (!_recordVoice)
             micro.volume = (sourceVolume / 100);
         else
             voice.volume = (sourceVolume / 100);
 
-        loudness = GetAveragedVolume() * sensitivity * (sourceVolume / 10);
+        _loudness = GetAveragedVolume() * sensitivity * (sourceVolume / 10);
+        //        _averageLoudness = _loudness/_countOfGetLoudness;
+        /*var curPos = _micPos;
+        var currentPart = Mathf.CeilToInt(_micPos/numOfGetSamplesForAvLoudness) * numOfGetSamplesForAvLoudness;
+        print(curPos);
+        print(" > ");
+        print(currentPart);*/
 
-        _micPos = Microphone.GetPosition(null);
 
-        if (!finished.isPlaying)
+
+        if (!finished.isPlaying && !funnyMoment.isPlaying)
         {
             if (_notRecording)
             {
@@ -147,36 +156,41 @@ public class TomCatV3 : MonoBehaviour
         }
 
         if (_recordIsPlaying)
-            visualization.color = Color.green;
-        else if (!_recordVoice)
-            visualization.color = Color.white;
-
-
-        /*if (!_recordVoice && !_recordIsPlaying)
         {
-            if (_recordSamplesBeforeStart)
-            {
-                RecordSamplesBeforeVoice();
-            }
-            else if (!_recordSamplesBeforeStart)
-            {
-                _lastMicPos = _micPos;
-                _lastSampleBeforeVoice = _lastMicPos;
-                _samplesBeforeStartVoiceOffSet = 0;
-                _recordSamplesBeforeStart = true;   
-                RecordSamplesBeforeVoice();
-            }
-        }*/
+            visualization.color = Color.green;
 
+            if (voiceHandle == VoiceHandle.withFunnyMoments)
+            {
+                if (!funnyMoment.isPlaying && _loudness != 0 && _loudness < funnyMomentTreshold)
+                {
+                    if (_funnyMomentTime)
+                    {
+                        print("FUUUUUN");
+                        _funnyMomentTime = false;
+                        _funnyMomentTimer = Time.time + funnyMomentTime;
+                    }
+                    else
+                    {
+                        if (Time.time > _funnyMomentTimer)
+                        {
+                            PlayFunnyMoment();
+                            _funnyMomentTime = true;
+                        }
+                    }
+                }
+            }
+        }
+        else if (!_recordVoice && !funnyMoment.isPlaying)
+        {
+            visualization.color = Color.white;
+        }
 
-        if (!_recordIsPlaying && inputVoice == InputVoice.onUpdate)
+        if (!_recordIsPlaying && !funnyMoment.isPlaying && inputVoice == InputVoice.onUpdate)
             if (recordType == Record.withSamples)
             {
-                /*if (voice.isPlaying == false)
-                {*/
                 if (_recordVoice)
                     RecordWithSamples();
-                if (loudness != 0 && loudness > startRecordThreshold)
+                if (_loudness != 0 && _loudness > startRecordThreshold)
                 {
                     _notEndRecordTimer = 0;
 
@@ -186,28 +200,21 @@ public class TomCatV3 : MonoBehaviour
                         _numOfClips++;
                         voice.clip = AudioClip.Create("MyClip_" + _numOfClips, _maxFreq * micro.clip.channels * voiceClipLength, micro.clip.channels, _maxFreq, false, false);
                         _voiceStartTime = Time.time;
-                        //                            _lastSample = 0;
-                        _lastMicPos = _micPos;
-                        _lastSample = _lastMicPos;
-                        _recordSamplesBeforeStart = false;
+                        _micPosOnStartRecord = _micPos;
+                        _lastSample = _micPosOnStartRecord;
 
                         _voiceOffSet = 0;
                         _recordVoice = true;
                     }
 
-                    /*_loudnessGetCount++;
-                    _averageLoudnessOfRecord += loudness;*/
-
-                    //                    RecordWithSamples();
                 }
 
-                if (loudness != 0 && loudness < endRecordThreshold)
+                if (_loudness != 0 && _loudness < endRecordThreshold)
                 {
                     if (_recordVoice)
                     {
                         if (_notEndRecordTimer == 0)
                             _notEndRecordTimer = Time.fixedTime + notEndRecordTime;
-                        //                        _notEndRecordTimer = Time.fixedDeltaTime;
 
                         if (_notEndRecordTimer <= Time.fixedTime)
                         {
@@ -217,30 +224,27 @@ public class TomCatV3 : MonoBehaviour
                             visualization.color = Color.white;
                             RecordSamplesAfterVoice();
                             _PlayVoiceRecord();
-                            _averageLoudnessOfRecord = _averageLoudnessOfRecord / _loudnessGetCount;
                         }
-
-                        //                        RecordWithSamples();
                     }
                 }
-                /*}*/
             }
+
+        _lastMicPos = _micPos;
     }
 
     void OnGUI()
     {
         _MicroLogString =
             "                     MICRO"
-            + "\n Loudness: " + loudness
-            + "\n DB: " + _dbValue
-            + "\n AvVol: " + GetAveragedVolume()
-            + "\n sensitivity: " + sensitivity
-            + "\n sourceVol: " + (sourceVolume / 10)
-            + "\n Channels: " + micro.clip.channels
-            + "\n Samples: " + micro.clip.samples
-            + "\n Average loudness of last record: " + _averageLoudnessOfRecord
-            + "\n Time: " + Time.time
-            + "\n Timer: " + _notEndRecordTimer;
+            + "\n Loudness: " + Math.Round(_loudness, 3)
+            + "\n AV Loudness: " + Math.Round(_averageLoudness, 3);
+        /*+ "\n AvVol: " + GetAveragedVolume()
+        + "\n sensitivity: " + sensitivity
+        + "\n sourceVol: " + (sourceVolume / 10)
+        + "\n Channels: " + micro.clip.channels
+        + "\n Samples: " + micro.clip.samples
+        + "\n Time: " + Time.time
+        + "\n Timer: " + _notEndRecordTimer;*/
         if (voice.clip != null)
             _MicroLogString += "\n Voice clip: " + voice.clip.length;
 
@@ -252,12 +256,10 @@ public class TomCatV3 : MonoBehaviour
             + "\n Voice end: " + _voiceEndTime
             + "\n Last Sample: " + _lastSample
             + "\n Microphone pos: " + _micPos
-            + "\n Last mic pos: " + _lastMicPos
+            + "\n Last mic pos: " + _micPosOnStartRecord
             + "\n Mic samples(samp * channels): " + _micSamples
             + "\n Voice record length : " + _voiceLength
-            + "\n Voice record length(sec) : " + _voiceLength / _maxFreq
-            + "\n Samples before start: " + _samplesBeforeStartVoiceOffSet
-            + "\n Last mic pos before start: " + _lastMicPosBeforeStart;
+            + "\n Voice record length(sec) : " + _voiceLength / _maxFreq;
 
         /*_TreasholdsString =
             "                     Tresholds"
@@ -267,10 +269,8 @@ public class TomCatV3 : MonoBehaviour
         startTresholdLabel.text = "Start treshold: " + startRecordThreshold.ToString();
         endTresholdLabel.text = "End treshold: " + endRecordThreshold.ToString();
 
-        GUI.TextArea(new Rect(10, 10, 230, 300), _MicroLogString);
-        GUI.TextArea(new Rect(Screen.width - 240, 10, 230, 300), _RecordLogString);
-        //        GUI.TextArea(new Rect(10, Screen.width/2, 230, 300), _TreasholdsString);
-        //        GUI.TextArea(new Rect(10, 10, 180, 300), _MicroLogString);
+        GUI.TextArea(new Rect(10, 10, 160, 100), _MicroLogString);
+        //        GUI.TextArea(new Rect(Screen.width - 240, 10, 230, 300), _RecordLogString);
     }
 
     public void _StartVoiceRecord()
@@ -290,7 +290,7 @@ public class TomCatV3 : MonoBehaviour
 
             visualization.color = Color.red;
 
-            Debug.LogWarning("Start record " + loudness);
+            Debug.LogWarning("Start record " + _loudness);
         }
         else
         {
@@ -303,7 +303,7 @@ public class TomCatV3 : MonoBehaviour
 
             visualization.color = Color.red;
 
-            Debug.LogWarning("Start record " + loudness);
+            Debug.LogWarning("Start record " + _loudness);
         }
     }
 
@@ -316,7 +316,7 @@ public class TomCatV3 : MonoBehaviour
         _PlayVoiceRecord();
 
         visualization.color = Color.green;
-        Debug.LogWarning("End record " + loudness);
+        Debug.LogWarning("End record " + _loudness);
     }
 
     public void _PlayVoiceRecord()
@@ -345,9 +345,7 @@ public class TomCatV3 : MonoBehaviour
             finished.Play();
 
             _notRecording = true;
-            /*samplesBeforeStart.mute = false;
-            samplesBeforeStart.loop = false;
-            samplesBeforeStart.Play();*/
+            _funnyMomentTime = true;
         }
     }
 
@@ -373,30 +371,15 @@ public class TomCatV3 : MonoBehaviour
         {
             var randNum = Random.Range(0, 10) > 5 ? 0 : 1;
 
-            var randPitch = randNum == 0
+            _randPitch = randNum == 0
                     ? Random.Range((float)pitchSlowBound.x, pitchSlowBound.y)
                     : Random.Range((float)pitchFastBound.x, pitchFastBound.y);
 
-            voice.pitch = randPitch;
+            voice.pitch = _randPitch;
         }
         else if (recordType == Record.withSamples)
         {
             //             ЗАпись в 3ий
-
-            var randNum = Random.Range(0, 10) > 5 ? 0 : 1;
-            float randPitch;
-
-            if (!onlyFunnyVoice)
-            {
-                randPitch = randNum == 0
-                        ? Random.Range((float)pitchSlowBound.x, pitchSlowBound.y)
-                        : Random.Range((float)pitchFastBound.x, pitchFastBound.y);
-            }
-            else
-            {
-                randPitch = Random.Range((float)pitchFastBound.x, pitchFastBound.y);
-            }
-
             _voiceLength = Mathf.CeilToInt(_maxFreq * (_voiceEndTime - _voiceStartTime) * voice.clip.channels);
             print(_voiceLength);
 
@@ -410,12 +393,12 @@ public class TomCatV3 : MonoBehaviour
 
             /*float[] dataSamplesAfterEnd = new float[numOfSamplesAfterEnd];
             _samplesAfterEnd.GetData(dataSamplesAfterEnd, 0);*/
-            Destroy(finished.clip);
+            if (finished.clip != null)
+                Destroy(finished.clip);
             finished.clip = AudioClip.Create("Finished_" + _numOfClips, _voiceLength + numOfSamplesBeforeStart /*+ numOfSamplesAfterEnd*/, voice.clip.channels, _maxFreq, false, false);
             finished.clip.SetData(dataSamplesBeforeStart, 0);
             finished.clip.SetData(dataVoice, numOfSamplesBeforeStart);
             //            finished.clip.SetData(dataSamplesAfterEnd, numOfSamplesBeforeStart + _voiceLength);
-            finished.pitch = randPitch;
 
             float[] samples = new float[finished.clip.samples * finished.clip.channels];
             finished.clip.GetData(samples, 0);
@@ -430,57 +413,64 @@ public class TomCatV3 : MonoBehaviour
             Destroy(samplesBeforeStart.clip);
             Destroy(voice.clip);
             Destroy(_samplesAfterEnd);
-            /*Запись во 2ой
-            var randNum = Random.Range(0, 10) > 5 ? 0 : 1;
 
-            var randPitch = randNum == 0
-                    ? Random.Range((float)pitchSlowBound.x, pitchSlowBound.y)
-                    : Random.Range((float)pitchFastBound.x, pitchFastBound.y);
+            switch (voiceHandle)
+            {
+                case VoiceHandle.onlyRandPitch:
+                    if (onlyFunnyVoice)
+                    {
+                        _randPitch = Random.Range((float)pitchFastBound.x, pitchFastBound.y);
+                    }
+                    else
+                    {
+                        var randNum = Random.Range(0, 10) > 5 ? 0 : 1;
 
-            voice.pitch = randPitch;*/
+                        _randPitch = randNum == 0
+                            ? Random.Range((float)pitchSlowBound.x, pitchSlowBound.y)
+                            : Random.Range((float)pitchFastBound.x, pitchFastBound.y);
+                    }
+                    finished.pitch = _randPitch;
+                    break;
+                case VoiceHandle.reversePlaying:
+
+                    if (onlyFunnyVoice)
+                    {
+                        _randPitch = Random.Range((float)pitchFastBound.x, pitchFastBound.y);
+                    }
+                    else
+                    {
+                        var randNum = Random.Range(0, 10) > 5 ? 0 : 1;
+
+                        _randPitch = randNum == 0
+                            ? Random.Range((float)pitchSlowBound.x, pitchSlowBound.y)
+                            : Random.Range((float)pitchFastBound.x, pitchFastBound.y);
+                    }
+
+                    _randPitch = -_randPitch;
+
+                    finished.pitch = _randPitch;
+                    finished.time = finished.clip.length;
+                    break;
+                case VoiceHandle.withFunnyMoments:
+
+                    break;
+            }
         }
-
-        //        micro.pitch = randPitch;
     }
 
     public void _HandleSamplesBeforeStart()
     {
-        /*float[] partOne = new float[_lastSampleBeforeVoice];
+        float[] partOne = new float[_micPosOnStartRecord];
         samplesBeforeStart.clip.GetData(partOne, 0);
 
         var samplesLength = samplesBeforeStart.clip.samples * samplesBeforeStart.clip.channels;
-        var secondPartLength = samplesLength - _lastSampleBeforeVoice;
-
-        float[] partTwo = new float[secondPartLength];
-        samplesBeforeStart.clip.GetData(partTwo, _lastSampleBeforeVoice);
-
-        samplesBeforeStart.clip.SetData(partTwo, 0);
-        samplesBeforeStart.clip.SetData(partOne, secondPartLength);*/
-
-
-        /*float[] partOne = new float[_lastMicPosBeforeStart];
-        samplesBeforeStart.clip.GetData(partOne, 0);
-
-        var samplesLength = samplesBeforeStart.clip.samples * samplesBeforeStart.clip.channels;
-        var secondPartLength = samplesLength - _lastMicPosBeforeStart;
-
-        float[] partTwo = new float[secondPartLength];
-        samplesBeforeStart.clip.GetData(partTwo, _lastMicPosBeforeStart);
-
-        samplesBeforeStart.clip.SetData(partTwo, 0);
-        samplesBeforeStart.clip.SetData(partOne, secondPartLength);*/
-
-        float[] partOne = new float[_lastMicPos];
-        samplesBeforeStart.clip.GetData(partOne, 0);
-
-        var samplesLength = samplesBeforeStart.clip.samples * samplesBeforeStart.clip.channels;
-        var secondPartLength = samplesLength - _lastMicPos;
+        var secondPartLength = samplesLength - _micPosOnStartRecord;
 
         print("SamplesLength: " + samplesLength);
         print("Second part Length: " + secondPartLength);
 
         float[] partTwo = new float[secondPartLength];
-        samplesBeforeStart.clip.GetData(partTwo, _lastMicPos);
+        samplesBeforeStart.clip.GetData(partTwo, _micPosOnStartRecord);
 
         samplesBeforeStart.clip.SetData(partTwo, 0);
         samplesBeforeStart.clip.SetData(partOne, secondPartLength);
@@ -510,38 +500,6 @@ public class TomCatV3 : MonoBehaviour
         }
 
         return a / amountSamples;
-    }
-
-    void RecordSamplesBeforeVoice()
-    {
-        /*var micPos = Microphone.GetPosition(null);
-        var diff = micPos - _lastSampleBeforeVoice;
-
-        if (diff > 0)
-        {
-            float[] data = new float[diff * micro.clip.channels];
-            micro.clip.GetData(data, _lastSampleBeforeVoice);
-            samplesBeforeStart.clip.SetData(data, _samplesBeforeStartVoiceOffSet);
-            _samplesBeforeStartVoiceOffSet += diff;
-            if (_samplesBeforeStartVoiceOffSet > _maxFreq)
-                _samplesBeforeStartVoiceOffSet = 0;
-        }
-
-        _lastSampleBeforeVoice = micPos;*/
-        var micPos = Microphone.GetPosition(null);
-        var diff = micPos - _lastSampleBeforeVoice;
-
-        if (diff > 0)
-        {
-            float[] data = new float[diff * micro.clip.channels];
-            micro.clip.GetData(data, micPos);
-            samplesBeforeStart.clip.SetData(data, _samplesBeforeStartVoiceOffSet);
-            _lastMicPosBeforeStart = micPos;
-            _samplesBeforeStartVoiceOffSet += diff;
-            if (_samplesBeforeStartVoiceOffSet >= numOfSamplesBeforeStart)
-                _samplesBeforeStartVoiceOffSet = 0;
-        }
-        _lastSampleBeforeVoice = micPos;
     }
 
     void TakeSecFromMic()
@@ -603,4 +561,141 @@ public class TomCatV3 : MonoBehaviour
     {
         onlyFunnyVoice = !onlyFunnyVoice;
     }
+
+    public void HandleFromClip()
+    {
+        switch (voiceHandle)
+        {
+            case VoiceHandle.onlyRandPitch:
+                if (onlyFunnyVoice)
+                {
+                    _randPitch = Random.Range((float)pitchFastBound.x, pitchFastBound.y);
+                }
+                else
+                {
+                    var randNum = Random.Range(0, 10) > 5 ? 0 : 1;
+
+                    _randPitch = randNum == 0
+                        ? Random.Range((float)pitchSlowBound.x, pitchSlowBound.y)
+                        : Random.Range((float)pitchFastBound.x, pitchFastBound.y);
+                }
+
+                finished.time = 0;
+                finished.pitch = _randPitch;
+                break;
+            case VoiceHandle.reversePlaying:
+
+                if (onlyFunnyVoice)
+                {
+                    _randPitch = Random.Range((float)pitchFastBound.x, pitchFastBound.y);
+                }
+                else
+                {
+                    var randNum = Random.Range(0, 10) > 5 ? 0 : 1;
+
+                    _randPitch = randNum == 0
+                        ? Random.Range((float)pitchSlowBound.x, pitchSlowBound.y)
+                        : Random.Range((float)pitchFastBound.x, pitchFastBound.y);
+                }
+
+                _randPitch = -_randPitch;
+
+                finished.pitch = _randPitch;
+                finished.time = finished.clip.length;
+                break;
+            case VoiceHandle.withFunnyMoments:
+
+                break;
+        }
+
+        finished.mute = false;
+        finished.loop = false;
+        finished.Play();
+    }
+
+    public void ChangeVoiceHandle(string name)
+    {
+        if (name == "PlayReverse")
+        {
+            if (voiceHandle == VoiceHandle.reversePlaying)
+            {
+                voiceHandle = VoiceHandle.onlyRandPitch;
+            }
+            else if (voiceHandle == VoiceHandle.onlyRandPitch)
+            {
+                voiceHandle = VoiceHandle.reversePlaying;
+            }
+            else if (voiceHandle == VoiceHandle.withFunnyMoments)
+            {
+                withFunnyMomentsToggle.value = false;
+                voiceHandle = VoiceHandle.reversePlaying;
+            }
+        }
+        else if (name == "WithFunnyMoments")
+        {
+            if (voiceHandle == VoiceHandle.withFunnyMoments)
+            {
+                voiceHandle = VoiceHandle.onlyRandPitch;
+            }
+            else if (voiceHandle == VoiceHandle.onlyRandPitch)
+            {
+                voiceHandle = VoiceHandle.withFunnyMoments;
+            }
+            else if (voiceHandle == VoiceHandle.reversePlaying)
+            {
+                playReverseToggle.value = false;
+                voiceHandle = VoiceHandle.withFunnyMoments;
+            }
+        }
+    }
+
+    public void PlayFunnyMoment()
+    {
+        finished.Stop();
+        funnyMoment.clip = funnyMoments[0/*Random.Range(0, funnyMoments.Count + 1)*/];
+        funnyMoment.Play();
+    }
+
+    /*private void GetAverageLoudnessOnRange()
+    {
+        funnyMoment.clip = AudioClip.Create("SamplesBeforeStart_" + _numOfClips, micro.clip.samples * micro.clip.channels, micro.clip.channels, _maxFreq, false, false);
+        float[] data = new float[micro.clip.samples * micro.clip.channels];
+        micro.clip.GetData(data, 0);
+        funnyMoment.clip.SetData(data, 0);
+
+        float[] partOne = new float[_micPosOnStartRecord];
+        funnyMoment.clip.GetData(partOne, 0);
+
+        var samplesLength = funnyMoment.clip.samples * funnyMoment.clip.channels;
+        var secondPartLength = samplesLength - _micPosOnStartRecord;
+
+        print("SamplesLength: " + samplesLength);
+        print("Second part Length: " + secondPartLength);
+
+        float[] partTwo = new float[secondPartLength];
+        funnyMoment.clip.GetData(partTwo, _micPosOnStartRecord);
+
+        funnyMoment.clip.SetData(partTwo, 0);
+        funnyMoment.clip.SetData(partOne, secondPartLength);
+
+        float[] result = new float[numOfSamplesBeforeStart];
+        funnyMoment.clip.GetData(result, _maxFreq - numOfSamplesBeforeStart);
+
+        funnyMoment.clip = AudioClip.Create("funnyMoment_" + _numOfClips,
+            numOfSamplesBeforeStart * micro.clip.channels, micro.clip.channels, _maxFreq, false, false);
+
+        funnyMoment.clip.SetData(result, 0);
+
+        float[] avLoud = new float[numOfGetSamplesForAvLoudness];
+        funnyMoment.clip.GetData(avLoud, _micSamples - numOfGetSamplesForAvLoudness);
+
+        float sumOfSamples = 0;
+
+        for (int i = 0; i < avLoud.Length; i++)
+        {
+            sumOfSamples += Mathf.Abs(avLoud[i]);
+        }
+
+        _averageLoudness = sumOfSamples / avLoud.Length;
+    }*/
 }
