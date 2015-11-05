@@ -50,6 +50,7 @@ public class TomCatV3 : MonoBehaviour
     public float notEndRecordTime = 0.5F;
     public float notRecordingTime = 0.3F;
     public float funnyMomentTime = 0.1F;
+    public float wordTime = 0.25F;
     public bool onlyFunnyVoice = true;
     public UISprite visualization;
     public List<AudioClip> funnyMoments;
@@ -94,6 +95,15 @@ public class TomCatV3 : MonoBehaviour
     private int _lastMicPos = 0;
     private bool _funnyMomentTime = false;
     private float _funnyMomentTimer;
+    private float _finishedTimeStop;
+    private float _timeFromLastFunnyMoment = 0;
+
+
+    void Start()
+    {
+        _timeFromLastFunnyMoment = wordTime;
+    }
+
     public void GetMicCaps()
     {
         Microphone.GetDeviceCaps(null, out _minFreq, out _maxFreq);//Gets the frequency of the device
@@ -110,7 +120,6 @@ public class TomCatV3 : MonoBehaviour
         micro.Play(); // Play the audio source!
 
 
-
         _micSamples = micro.clip.samples * micro.clip.channels;
     }
 
@@ -125,7 +134,6 @@ public class TomCatV3 : MonoBehaviour
 
         _micPos = Microphone.GetPosition(null);
 
-
         if (!_recordVoice)
             micro.volume = (sourceVolume / 100);
         else
@@ -139,97 +147,227 @@ public class TomCatV3 : MonoBehaviour
         print(" > ");
         print(currentPart);*/
 
-
-
-        if (!finished.isPlaying && !funnyMoment.isPlaying)
+        switch (voiceHandle)
         {
-            if (_notRecording)
-            {
-                _notRecording = false;
-                _notRecordingTimer = Time.time + notRecordingTime;
-            }
-
-            if (Time.time > _notRecordingTimer)
-            {
-                _recordIsPlaying = false;
-            }
-        }
-
-        if (_recordIsPlaying)
-        {
-            visualization.color = Color.green;
-
-            if (voiceHandle == VoiceHandle.withFunnyMoments)
-            {
-                if (!funnyMoment.isPlaying && _loudness != 0 && _loudness < funnyMomentTreshold)
+            case VoiceHandle.withFunnyMoments:
+                if (_recordIsPlaying)
                 {
-                    if (_funnyMomentTime)
+                    _timeFromLastFunnyMoment += Time.fixedDeltaTime;
+
+                    if (finished.isPlaying)
+                        visualization.color = Color.green;
+                    else if (funnyMoment.isPlaying)
+                        visualization.color = Color.magenta;
+
+                    if (finished.time >= finished.clip.length)
                     {
-                        print("FUUUUUN");
-                        _funnyMomentTime = false;
-                        _funnyMomentTimer = Time.time + funnyMomentTime;
+                        _recordIsPlaying = false;
+                        _finishedTimeStop = 0;
+                    }
+
+                    if (!_funnyMomentTime)
+                    {
+                        if (_loudness > 0 && _loudness < funnyMomentTreshold && _timeFromLastFunnyMoment > wordTime)
+                            _funnyMomentTimer += Time.fixedDeltaTime;
+                        else
+                            _funnyMomentTimer = 0;
+
+                        if (_funnyMomentTimer >= funnyMomentTime)
+                        {
+                            _funnyMomentTime = true;
+                            _PlayFunnyMoment();
+                        }
                     }
                     else
                     {
-                        if (Time.time > _funnyMomentTimer)
+                        if (!funnyMoment.isPlaying)
                         {
-                            PlayFunnyMoment();
-                            _funnyMomentTime = true;
+                            _timeFromLastFunnyMoment = 0;
+                            _funnyMomentTime = false;
+                            _funnyMomentTimer = 0;
+                            _ContinueFinishedClip();
                         }
                     }
                 }
-            }
-        }
-        else if (!_recordVoice && !funnyMoment.isPlaying)
-        {
-            visualization.color = Color.white;
-        }
-
-        if (!_recordIsPlaying && !funnyMoment.isPlaying && inputVoice == InputVoice.onUpdate)
-            if (recordType == Record.withSamples)
-            {
-                if (_recordVoice)
-                    RecordWithSamples();
-                if (_loudness != 0 && _loudness > startRecordThreshold)
+                else
                 {
-                    _notEndRecordTimer = 0;
-
-                    if (!_recordVoice)
-                    {
-                        TakeSecFromMic();
-                        _numOfClips++;
-                        voice.clip = AudioClip.Create("MyClip_" + _numOfClips, _maxFreq * micro.clip.channels * voiceClipLength, micro.clip.channels, _maxFreq, false, false);
-                        _voiceStartTime = Time.time;
-                        _micPosOnStartRecord = _micPos;
-                        _lastSample = _micPosOnStartRecord;
-
-                        _voiceOffSet = 0;
-                        _recordVoice = true;
-                    }
-
+                    finished.time = 0;
+                    visualization.color = Color.white;
                 }
+                
 
-                if (_loudness != 0 && _loudness < endRecordThreshold)
-                {
-                    if (_recordVoice)
+                if (!_recordIsPlaying && inputVoice == InputVoice.onUpdate)
+                    if (recordType == Record.withSamples)
                     {
-                        if (_notEndRecordTimer == 0)
-                            _notEndRecordTimer = Time.fixedTime + notEndRecordTime;
-
-                        if (_notEndRecordTimer <= Time.fixedTime)
+                        if (_recordVoice)
+                            RecordWithSamples();
+                        if (_loudness != 0 && _loudness > startRecordThreshold)
                         {
                             _notEndRecordTimer = 0;
-                            _recordVoice = false;
-                            _voiceEndTime = Time.time;
-                            visualization.color = Color.white;
-                            RecordSamplesAfterVoice();
-                            _PlayVoiceRecord();
+
+                            if (!_recordVoice)
+                            {
+                                TakeSecFromMic();
+                                _numOfClips++;
+                                voice.clip = AudioClip.Create("MyClip_" + _numOfClips, _maxFreq * micro.clip.channels * voiceClipLength, micro.clip.channels, _maxFreq, false, false);
+                                _voiceStartTime = Time.time;
+                                _micPosOnStartRecord = _micPos;
+                                _lastSample = _micPosOnStartRecord;
+
+                                _voiceOffSet = 0;
+                                _recordVoice = true;
+                            }
+
+                        }
+
+                        if (_loudness != 0 && _loudness < endRecordThreshold)
+                        {
+                            if (_recordVoice)
+                            {
+                                if (_notEndRecordTimer == 0)
+                                    _notEndRecordTimer = Time.fixedTime + notEndRecordTime;
+
+                                if (_notEndRecordTimer <= Time.fixedTime)
+                                {
+                                    _notEndRecordTimer = 0;
+                                    _recordVoice = false;
+                                    _voiceEndTime = Time.time;
+                                    visualization.color = Color.white;
+                                    RecordSamplesAfterVoice();
+                                    _PlayVoiceRecord();
+                                }
+                            }
+                        }
+                    }
+
+                _lastMicPos = _micPos;
+                break;
+            default:
+                if (!finished.isPlaying /*&& !funnyMoment.isPlaying*/)
+                {
+                    if (_notRecording)
+                    {
+                        _notRecording = false;
+                        _notRecordingTimer = Time.time + notRecordingTime;
+                    }
+
+                    if (Time.time > _notRecordingTimer)
+                    {
+                        _recordIsPlaying = false;
+                    }
+                }
+
+                if (!finished.isPlaying)
+                    _recordIsPlaying = false;
+
+                /*if (voiceHandle != VoiceHandle.withFunnyMoments)
+                {
+                    if (!finished.isPlaying)
+                        _recordIsPlaying = false;
+
+                    if (!finished.isPlaying && !funnyMoment.isPlaying)
+                    {
+                        if (_notRecording)
+                        {
+                            _notRecording = false;
+                            _notRecordingTimer = Time.time + notRecordingTime;
+                        }
+
+                        if (Time.time > _notRecordingTimer)
+                        {
+                            _recordIsPlaying = false;
                         }
                     }
                 }
-            }
+                else
+                {
+                    if (!_funnyMomentTime && !finished.isPlaying)
+                        _recordIsPlaying = false;
+                }*/
 
-        _lastMicPos = _micPos;
+                if (_recordIsPlaying)
+                {
+                    /*if (funnyMoment.isPlaying)
+                        visualization.color = Color.magenta;
+                    else*/
+                    visualization.color = Color.green;
+
+                    /*if (voiceHandle == VoiceHandle.withFunnyMoments)
+                    {
+
+                        if (!funnyMoment.isPlaying && _loudness != 0 && _loudness < funnyMomentTreshold)
+                        {
+                            if (_funnyMomentTime)
+                            {
+                                print("FUUUUUN");
+                                print(Time.time);
+                                _funnyMomentTime = false;
+                                _funnyMomentTimer = Time.time + funnyMomentTime;
+                            }
+
+                            if (Time.time > _funnyMomentTimer)
+                            {
+                                PlayFunnyMoment();
+                            }
+                        }
+
+                        if (!funnyMoment.isPlaying && !_funnyMomentTime && Time.time > _funnyMomentTimer)
+                            _funnyMomentTime = true;
+
+                    }*/
+                }
+                else if (!_recordVoice /*&& !funnyMoment.isPlaying*/)
+                {
+                    visualization.color = Color.white;
+                }
+
+                if (!_recordIsPlaying && /*!funnyMoment.isPlaying && */inputVoice == InputVoice.onUpdate)
+                    if (recordType == Record.withSamples)
+                    {
+                        if (_recordVoice)
+                            RecordWithSamples();
+                        if (_loudness != 0 && _loudness > startRecordThreshold)
+                        {
+                            _notEndRecordTimer = 0;
+
+                            if (!_recordVoice)
+                            {
+                                TakeSecFromMic();
+                                _numOfClips++;
+                                voice.clip = AudioClip.Create("MyClip_" + _numOfClips, _maxFreq * micro.clip.channels * voiceClipLength, micro.clip.channels, _maxFreq, false, false);
+                                _voiceStartTime = Time.time;
+                                _micPosOnStartRecord = _micPos;
+                                _lastSample = _micPosOnStartRecord;
+
+                                _voiceOffSet = 0;
+                                _recordVoice = true;
+                            }
+
+                        }
+
+                        if (_loudness != 0 && _loudness < endRecordThreshold)
+                        {
+                            if (_recordVoice)
+                            {
+                                if (_notEndRecordTimer == 0)
+                                    _notEndRecordTimer = Time.fixedTime + notEndRecordTime;
+
+                                if (_notEndRecordTimer <= Time.fixedTime)
+                                {
+                                    _notEndRecordTimer = 0;
+                                    _recordVoice = false;
+                                    _voiceEndTime = Time.time;
+                                    visualization.color = Color.white;
+                                    RecordSamplesAfterVoice();
+                                    _PlayVoiceRecord();
+                                }
+                            }
+                        }
+                    }
+
+                _lastMicPos = _micPos;
+                break;
+        }
     }
 
     void OnGUI()
@@ -259,7 +397,8 @@ public class TomCatV3 : MonoBehaviour
             + "\n Last mic pos: " + _micPosOnStartRecord
             + "\n Mic samples(samp * channels): " + _micSamples
             + "\n Voice record length : " + _voiceLength
-            + "\n Voice record length(sec) : " + _voiceLength / _maxFreq;
+            + "\n Voice record length(sec) : " + _voiceLength / _maxFreq
+            + "\n Finished time: " + finished.time;
 
         /*_TreasholdsString =
             "                     Tresholds"
@@ -270,7 +409,7 @@ public class TomCatV3 : MonoBehaviour
         endTresholdLabel.text = "End treshold: " + endRecordThreshold.ToString();
 
         GUI.TextArea(new Rect(10, 10, 160, 100), _MicroLogString);
-        //        GUI.TextArea(new Rect(Screen.width - 240, 10, 230, 300), _RecordLogString);
+        GUI.TextArea(new Rect(10, 120, 230, 200), _RecordLogString);
     }
 
     public void _StartVoiceRecord()
@@ -345,7 +484,7 @@ public class TomCatV3 : MonoBehaviour
             finished.Play();
 
             _notRecording = true;
-            _funnyMomentTime = true;
+            //            _funnyMomentTime = true;
         }
     }
 
@@ -394,7 +533,7 @@ public class TomCatV3 : MonoBehaviour
             /*float[] dataSamplesAfterEnd = new float[numOfSamplesAfterEnd];
             _samplesAfterEnd.GetData(dataSamplesAfterEnd, 0);*/
             if (finished.clip != null)
-                Destroy(finished.clip);
+                DestroyImmediate(finished.clip);
             finished.clip = AudioClip.Create("Finished_" + _numOfClips, _voiceLength + numOfSamplesBeforeStart /*+ numOfSamplesAfterEnd*/, voice.clip.channels, _maxFreq, false, false);
             finished.clip.SetData(dataSamplesBeforeStart, 0);
             finished.clip.SetData(dataVoice, numOfSamplesBeforeStart);
@@ -410,9 +549,9 @@ public class TomCatV3 : MonoBehaviour
             }
             finished.clip.SetData(samples, 0);
 
-            Destroy(samplesBeforeStart.clip);
-            Destroy(voice.clip);
-            Destroy(_samplesAfterEnd);
+            DestroyImmediate(samplesBeforeStart.clip);
+            DestroyImmediate(voice.clip);
+            DestroyImmediate(_samplesAfterEnd);
 
             switch (voiceHandle)
             {
@@ -452,7 +591,8 @@ public class TomCatV3 : MonoBehaviour
                     finished.time = finished.clip.length;
                     break;
                 case VoiceHandle.withFunnyMoments:
-
+                    /*finished.pitch = 1.78F;*/
+                    finished.pitch = 1F;
                     break;
             }
         }
@@ -611,6 +751,7 @@ public class TomCatV3 : MonoBehaviour
         finished.mute = false;
         finished.loop = false;
         finished.Play();
+        _recordIsPlaying = true;
     }
 
     public void ChangeVoiceHandle(string name)
@@ -649,12 +790,27 @@ public class TomCatV3 : MonoBehaviour
         }
     }
 
-    public void PlayFunnyMoment()
+    private void _PlayFunnyMoment()
     {
+        _finishedTimeStop = finished.time;
         finished.Stop();
-        funnyMoment.clip = funnyMoments[0/*Random.Range(0, funnyMoments.Count + 1)*/];
+        funnyMoment.clip = funnyMoments[Random.Range(0, 1)];
         funnyMoment.Play();
     }
+
+    private void _ContinueFinishedClip()
+    {
+        _funnyMomentTime = false;
+        finished.Play();
+        finished.time = _finishedTimeStop;
+    }
+
+    /*public void PlayFunnyMoment()
+    {
+        finished.Stop();
+        funnyMoment.clip = funnyMoments[0/*Random.Range(0, funnyMoments.Count + 1)#1#];
+        funnyMoment.Play();
+    }*/
 
     /*private void GetAverageLoudnessOnRange()
     {
