@@ -2,9 +2,11 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using UnityEngine.UI;
+using Debug = UnityEngine.Debug;
 using Random = UnityEngine.Random;
 
 [RequireComponent(typeof(AudioSource))]
@@ -34,6 +36,8 @@ public class TomCatV3 : MonoBehaviour
     public VoiceHandle voiceHandle = VoiceHandle.onlyRandPitch;
     public float startRecordThreshold = 100F;
     public float endRecordThreshold = 40F;
+    public float startWordThreshold = 1F;
+    public float endWordThreshold = 1F;
     public float funnyMomentTreshold;
     public Vector2 pitchSlowBound;
     public Vector2 pitchFastBound;
@@ -51,9 +55,14 @@ public class TomCatV3 : MonoBehaviour
     public float notRecordingTime = 0.3F;
     public float funnyMomentTime = 0.1F;
     public float wordTime = 0.25F;
+    public float notEndWordTime = 0.07F;
     public bool onlyFunnyVoice = true;
     public UISprite visualization;
     public List<AudioClip> funnyMoments;
+
+    public float sampleWidth = 0.02F;
+    public Transform samplesParent;
+    public GameObject cube;
 
     public AudioSource micro;
     public AudioSource voice;
@@ -69,7 +78,7 @@ public class TomCatV3 : MonoBehaviour
     private AudioClip _avLoudness;
     private bool _recordVoice = false;
     private float _loudness;
-    private int amountSamples = 256; //increase to get better average, but will decrease performance. Best to leave it
+    private int amountSamples = 1378; //increase to get better average, but will decrease performance. Best to leave it
     private string _MicroLogString;
     private string _RecordLogString;
     private string _TreasholdsString;
@@ -97,11 +106,19 @@ public class TomCatV3 : MonoBehaviour
     private float _funnyMomentTimer;
     private float _finishedTimeStop;
     private float _timeFromLastFunnyMoment = 0;
+    private float _wordTime;
+    private bool _waitForNextWord;
+    private bool _word = false;
+    private float _notEndWordTimer;
+    private bool _nextWord = false;
 
+    private List<int> _wordBegins;
+    private List<int> _wordEndings;
 
     void Start()
     {
-        _timeFromLastFunnyMoment = wordTime;
+        _wordTime = wordTime;
+        _timeFromLastFunnyMoment = _wordTime;
     }
 
     public void GetMicCaps()
@@ -134,12 +151,15 @@ public class TomCatV3 : MonoBehaviour
 
         _micPos = Microphone.GetPosition(null);
 
+
         if (!_recordVoice)
             micro.volume = (sourceVolume / 100);
         else
             voice.volume = (sourceVolume / 100);
 
-        _loudness = GetAveragedVolume() * sensitivity * (sourceVolume / 10);
+        _loudness = GetAveragedVolume();
+
+        //        print(_loudness);
         //        _averageLoudness = _loudness/_countOfGetLoudness;
         /*var curPos = _micPos;
         var currentPart = Mathf.CeilToInt(_micPos/numOfGetSamplesForAvLoudness) * numOfGetSamplesForAvLoudness;
@@ -152,8 +172,8 @@ public class TomCatV3 : MonoBehaviour
             case VoiceHandle.withFunnyMoments:
                 if (_recordIsPlaying)
                 {
-                    _timeFromLastFunnyMoment += Time.fixedDeltaTime;
-
+                    Visualize();
+                    //                    _timeFromLastFunnyMoment += Time.fixedDeltaTime;
                     if (finished.isPlaying)
                         visualization.color = Color.green;
                     else if (funnyMoment.isPlaying)
@@ -165,24 +185,47 @@ public class TomCatV3 : MonoBehaviour
                         _finishedTimeStop = 0;
                     }
 
-                    if (!_funnyMomentTime)
+                    if (finished.isPlaying && !_word && _loudness != 0 && _loudness > startWordThreshold)
                     {
-                        if (_loudness > 0 && _loudness < funnyMomentTreshold && _timeFromLastFunnyMoment > wordTime)
+                        _word = true;
+                        _nextWord = false;
+                    }
+
+                    if (finished.isPlaying && _word && _loudness != 0 && _loudness < endWordThreshold)
+                    {
+                        if (_notEndWordTimer == 0)
+                            _notEndWordTimer = Time.fixedTime + notEndWordTime;
+
+                        if (_notEndWordTimer <= Time.fixedTime)
+                        {
+                            _notEndWordTimer = 0;
+                            _word = false;
+                        }
+                    }
+
+                    if (!_nextWord && !_funnyMomentTime && !_word)
+                    {
+                        if (_loudness > 0 && _loudness < funnyMomentTreshold /*&& Time.time >= _timeFromLastFunnyMoment*/)
+                        {
                             _funnyMomentTimer += Time.fixedDeltaTime;
+                        }
                         else
                             _funnyMomentTimer = 0;
 
                         if (_funnyMomentTimer >= funnyMomentTime)
                         {
+                            print("PlayMomentTime");
                             _funnyMomentTime = true;
                             _PlayFunnyMoment();
                         }
                     }
                     else
                     {
-                        if (!funnyMoment.isPlaying)
+                        if (!funnyMoment.isPlaying && !finished.isPlaying)
                         {
-                            _timeFromLastFunnyMoment = 0;
+                            print("Continue");
+                            //                            print(_timeFromLastFunnyMoment);
+                            //                            _timeFromLastFunnyMoment = Time.time + wordTime;
                             _funnyMomentTime = false;
                             _funnyMomentTimer = 0;
                             _ContinueFinishedClip();
@@ -192,9 +235,10 @@ public class TomCatV3 : MonoBehaviour
                 else
                 {
                     finished.time = 0;
+                    _timeFromLastFunnyMoment = 0;
                     visualization.color = Color.white;
                 }
-                
+
 
                 if (!_recordIsPlaying && inputVoice == InputVoice.onUpdate)
                     if (recordType == Record.withSamples)
@@ -370,6 +414,23 @@ public class TomCatV3 : MonoBehaviour
         }
     }
 
+    void Visualize()
+    {
+        var diff = _micPos - _lastMicPos;
+
+        if (diff > 0)
+        {
+            float[] data = new float[diff * micro.clip.channels];
+
+            finished.clip.GetData(data, 0);
+
+            for (int i = 0; i < data.Length; i++)
+            {
+                cube.transform.localPosition = new Vector3(i* sampleWidth, data[i]);
+            }
+        }
+    }
+
     void OnGUI()
     {
         _MicroLogString =
@@ -533,7 +594,7 @@ public class TomCatV3 : MonoBehaviour
             /*float[] dataSamplesAfterEnd = new float[numOfSamplesAfterEnd];
             _samplesAfterEnd.GetData(dataSamplesAfterEnd, 0);*/
             if (finished.clip != null)
-                DestroyImmediate(finished.clip);
+                Destroy(finished.clip);
             finished.clip = AudioClip.Create("Finished_" + _numOfClips, _voiceLength + numOfSamplesBeforeStart /*+ numOfSamplesAfterEnd*/, voice.clip.channels, _maxFreq, false, false);
             finished.clip.SetData(dataSamplesBeforeStart, 0);
             finished.clip.SetData(dataVoice, numOfSamplesBeforeStart);
@@ -549,8 +610,8 @@ public class TomCatV3 : MonoBehaviour
             }
             finished.clip.SetData(samples, 0);
 
-            DestroyImmediate(samplesBeforeStart.clip);
-            DestroyImmediate(voice.clip);
+            Destroy(samplesBeforeStart.clip);
+            Destroy(voice.clip);
             DestroyImmediate(_samplesAfterEnd);
 
             switch (voiceHandle)
@@ -626,7 +687,7 @@ public class TomCatV3 : MonoBehaviour
 
     float GetAveragedVolume()
     {
-        float[] data = new float[amountSamples];
+        /*float[] data = new float[amountSamples];
         float a = 0;
 
         if (micro.isPlaying)
@@ -639,8 +700,46 @@ public class TomCatV3 : MonoBehaviour
             a += Mathf.Abs(s);
         }
 
-        return a / amountSamples;
+        return a / amountSamples;*/
+
+        var diff = _micPos - _lastMicPos;
+        //        print(diff);
+        float a = 0;
+
+        //        print(diff);
+
+        if (diff > 0)
+        {
+            float[] data = new float[diff * micro.clip.channels];
+
+            if (finished.isPlaying)
+                finished.GetOutputData(data, 0);
+            else if (micro.isPlaying)
+                micro.GetOutputData(data, 0);
+
+            foreach (float sample in data)
+            {
+                a += Mathf.Abs(sample);
+            }
+
+            return (a / diff) * sensitivity * (sourceVolume / 100);
+        }
+
+        return 0;
     }
+
+    float GetAveragedVolume(float[] data)
+    {
+        float a = 0;
+
+        foreach (float sample in data)
+        {
+            a += Mathf.Abs(sample);
+        }
+
+        return (a / data.Length) * sensitivity * (sourceVolume / 100);
+    }
+
 
     void TakeSecFromMic()
     {
@@ -744,6 +843,7 @@ public class TomCatV3 : MonoBehaviour
                 finished.time = finished.clip.length;
                 break;
             case VoiceHandle.withFunnyMoments:
+                
 
                 break;
         }
@@ -752,6 +852,7 @@ public class TomCatV3 : MonoBehaviour
         finished.loop = false;
         finished.Play();
         _recordIsPlaying = true;
+        _timeFromLastFunnyMoment = 0;
     }
 
     public void ChangeVoiceHandle(string name)
@@ -794,7 +895,10 @@ public class TomCatV3 : MonoBehaviour
     {
         _finishedTimeStop = finished.time;
         finished.Stop();
-        funnyMoment.clip = funnyMoments[Random.Range(0, 1)];
+        funnyMoment.clip = funnyMoments[Random.Range(0, funnyMoments.Count)];
+        /*_wordTime = wordTime + funnyMoment.clip.length;
+        print(_wordTime);*/
+        _nextWord = true;
         funnyMoment.Play();
     }
 
