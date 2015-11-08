@@ -56,9 +56,13 @@ public class TomCatV3 : MonoBehaviour
     public float funnyMomentTime = 0.1F;
     public float wordTime = 0.25F;
     public float notEndWordTime = 0.07F;
+    public float wordStartTreshold = 3F;
+    public float wordEndTreshold = 3F;
     public bool onlyFunnyVoice = true;
     public UISprite visualization;
     public List<AudioClip> funnyMoments;
+
+    public int finishedFrom;
 
     public float sampleWidth = 0.02F;
     public Transform samplesParent;
@@ -78,7 +82,7 @@ public class TomCatV3 : MonoBehaviour
     private AudioClip _avLoudness;
     private bool _recordVoice = false;
     private float _loudness;
-    private int amountSamples = 1378; //increase to get better average, but will decrease performance. Best to leave it
+    private int amountSamples = 820/*1378*/; //increase to get better average, but will decrease performance. Best to leave it
     private string _MicroLogString;
     private string _RecordLogString;
     private string _TreasholdsString;
@@ -102,18 +106,18 @@ public class TomCatV3 : MonoBehaviour
     private float _averageLoudness = 0;
     private int _countOfGetLoudness = 0;
     private int _lastMicPos = 0;
-    private bool _funnyMomentTime = false;
+    private bool _funnyMomentTime = true;
     private float _funnyMomentTimer;
-    private float _finishedTimeStop;
+    private int _finishedTimeStop;
     private float _timeFromLastFunnyMoment = 0;
     private float _wordTime;
     private bool _waitForNextWord;
     private bool _word = false;
-    private float _notEndWordTimer;
+    private float _notEndWordTimer = 0;
     private bool _nextWord = false;
 
-    private List<int> _wordBegins;
-    private List<int> _wordEndings;
+    public List<int> _wordBegins;
+    public List<int> _wordEndings;
 
     void Start()
     {
@@ -170,9 +174,9 @@ public class TomCatV3 : MonoBehaviour
         switch (voiceHandle)
         {
             case VoiceHandle.withFunnyMoments:
-                if (_recordIsPlaying)
+                /*if (_recordIsPlaying)
                 {
-                    Visualize();
+//                    Visualize();
                     //                    _timeFromLastFunnyMoment += Time.fixedDeltaTime;
                     if (finished.isPlaying)
                         visualization.color = Color.green;
@@ -205,7 +209,7 @@ public class TomCatV3 : MonoBehaviour
 
                     if (!_nextWord && !_funnyMomentTime && !_word)
                     {
-                        if (_loudness > 0 && _loudness < funnyMomentTreshold /*&& Time.time >= _timeFromLastFunnyMoment*/)
+                        if (_loudness > 0 && _loudness < funnyMomentTreshold /*&& Time.time >= _timeFromLastFunnyMoment#1#)
                         {
                             _funnyMomentTimer += Time.fixedDeltaTime;
                         }
@@ -237,8 +241,165 @@ public class TomCatV3 : MonoBehaviour
                     finished.time = 0;
                     _timeFromLastFunnyMoment = 0;
                     visualization.color = Color.white;
-                }
+                }*/
 
+                /*
+                        THE BEST
+                
+                if (_recordIsPlaying)
+                {
+                    //                    Visualize();
+                    //                    _timeFromLastFunnyMoment += Time.fixedDeltaTime;
+                    if (finished.isPlaying)
+                        visualization.color = Color.green;
+                    else if (funnyMoment.isPlaying)
+                        visualization.color = Color.magenta;
+
+                    if (finished.time >= finished.clip.length)
+                    {
+                        _recordIsPlaying = false;
+                        //                        _finishedTimeStop = 0;
+                    }
+
+                    if (finished.isPlaying && !_word && _loudness != 0 && _loudness > startWordThreshold)
+                    {
+                        _word = true;
+                    }
+
+                    if (finished.isPlaying && _word && _loudness != 0 && _loudness < endWordThreshold)
+                    {
+                        _notEndWordTimer += Time.fixedDeltaTime;
+
+                        if (_notEndWordTimer >= notEndWordTime)
+                        {
+                            _notEndWordTimer = 0;
+                            _word = false;
+                            _PlayFunnyMoment();
+                        }
+                    }
+                    else
+                    {
+                        _notEndWordTimer = 0;
+                    }
+
+                    if (!funnyMoment.isPlaying && !finished.isPlaying)
+                    {
+                        print("Continue");
+                        //                            print(_timeFromLastFunnyMoment);
+                        //                            _timeFromLastFunnyMoment = Time.time + wordTime;
+                        _funnyMomentTime = false;
+                        _funnyMomentTimer = 0;
+                        _ContinueFinishedClip();
+                    }
+                }
+                else
+                {
+                    finished.time = 0;
+                    _timeFromLastFunnyMoment = 0;
+                    visualization.color = Color.white;
+                }*/
+
+                /*if (_recordIsPlaying)
+                {
+                    if (finished.isPlaying)
+                        visualization.color = Color.green;
+                    else if (funnyMoment.isPlaying)
+                        visualization.color = Color.magenta;
+
+                    if (finished.time >= finished.clip.length)
+                    {
+                        _recordIsPlaying = false;
+                        _finishedTimeStop = 0;
+                    }
+
+                    if (finished.isPlaying && !_word && _loudness != 0 && _loudness > startWordThreshold)
+                    {
+                        _word = true;
+                    }
+
+                    if (finished.isPlaying && _word && _loudness != 0 && _loudness < endWordThreshold)
+                    {
+                        if (_notEndWordTimer == 0F)
+                            _notEndWordTimer = Time.fixedTime + notEndWordTime;
+
+                        if (_notEndWordTimer <= Time.fixedTime)
+                        {
+        //                            _notEndWordTimer = 0;
+                            _word = false;
+                        }
+                    }
+
+                    /*if (!_nextWord && !_funnyMomentTime && !_word)
+                    {
+                        if (_loudness > 0 && _loudness < funnyMomentTreshold /*&& Time.time >= _timeFromLastFunnyMoment#2#)
+                        {
+                            _funnyMomentTimer += Time.fixedDeltaTime;
+                        }
+                        else
+                            _funnyMomentTimer = 0;
+
+                        if (_funnyMomentTimer >= funnyMomentTime)
+                        {
+                            print("PlayMomentTime");
+                            _funnyMomentTime = true;
+                            _PlayFunnyMoment();
+                        }
+                    }#1#
+
+                    if (_funnyMomentTime && !_word)
+                    {
+                        print("PlayMomentTime");
+                        _funnyMomentTime = false;
+                        _PlayFunnyMoment();
+                    }
+                    else
+                    {
+                        if (!funnyMoment.isPlaying && !finished.isPlaying)
+                        {
+                            print("Continue");
+                            //                            print(_timeFromLastFunnyMoment);
+                            //                            _timeFromLastFunnyMoment = Time.time + wordTime;
+                            _funnyMomentTime = true;
+                            _funnyMomentTimer = 0;
+                            _ContinueFinishedClip();
+                        }
+                    }
+                }
+                else
+                {
+                    finished.timeSamples = 0;
+                    _timeFromLastFunnyMoment = 0;
+                    visualization.color = Color.white;
+                }*/
+
+                if (_recordIsPlaying)
+                {
+                    if (!_word && _loudness > wordStartTreshold)
+                    {
+                        _wordBegins.Add(finished.timeSamples);
+                        _word = true;
+                    }
+
+                    if (_word && _loudness < wordEndTreshold)
+                    {
+                        _wordEndings.Add(finished.timeSamples);
+                        _word = false;
+                        _PlayFunnyMoment();
+                    }
+
+                    if (!_word && !funnyMoment.isPlaying && !finished.isPlaying)
+                    {
+                        _ContinueFinishedClip();
+                    }
+
+                    if (finished.timeSamples >= finished.clip.samples)
+                    {
+                        finished.Stop();
+                        _finishedTimeStop = 0;
+                        finished.timeSamples = _finishedTimeStop;
+                        _recordIsPlaying = false;
+                    }
+                }
 
                 if (!_recordIsPlaying && inputVoice == InputVoice.onUpdate)
                     if (recordType == Record.withSamples)
@@ -426,7 +587,7 @@ public class TomCatV3 : MonoBehaviour
 
             for (int i = 0; i < data.Length; i++)
             {
-                cube.transform.localPosition = new Vector3(i* sampleWidth, data[i]);
+                cube.transform.localPosition = new Vector3(i * sampleWidth, data[i]);
             }
         }
     }
@@ -436,7 +597,8 @@ public class TomCatV3 : MonoBehaviour
         _MicroLogString =
             "                     MICRO"
             + "\n Loudness: " + Math.Round(_loudness, 3)
-            + "\n AV Loudness: " + Math.Round(_averageLoudness, 3);
+            + "\n AV Loudness: " + Math.Round(_averageLoudness, 3)
+            + "\n FixedTime: " + Time.fixedTime;
         /*+ "\n AvVol: " + GetAveragedVolume()
         + "\n sensitivity: " + sensitivity
         + "\n sourceVol: " + (sourceVolume / 10)
@@ -459,7 +621,8 @@ public class TomCatV3 : MonoBehaviour
             + "\n Mic samples(samp * channels): " + _micSamples
             + "\n Voice record length : " + _voiceLength
             + "\n Voice record length(sec) : " + _voiceLength / _maxFreq
-            + "\n Finished time: " + finished.time;
+            + "\n Finished time: " + finished.timeSamples;
+
 
         /*_TreasholdsString =
             "                     Tresholds"
@@ -542,6 +705,7 @@ public class TomCatV3 : MonoBehaviour
 
             finished.mute = false;
             finished.loop = false;
+            finished.timeSamples = 0;
             finished.Play();
 
             _notRecording = true;
@@ -702,7 +866,7 @@ public class TomCatV3 : MonoBehaviour
 
         return a / amountSamples;*/
 
-        var diff = _micPos - _lastMicPos;
+        /*var diff = _micPos - _lastMicPos;
         //        print(diff);
         float a = 0;
 
@@ -724,8 +888,32 @@ public class TomCatV3 : MonoBehaviour
 
             return (a / diff) * sensitivity * (sourceVolume / 100);
         }
-
         return 0;
+        
+        */
+
+        float[] data = new float[amountSamples];
+
+        if (finished.isPlaying)
+            finished.GetOutputData(data, 0);
+        else if (micro.isPlaying)
+            micro.GetOutputData(data, 0);
+
+        float a = 0;
+
+        for (int i = 0; i < data.Length; i++)
+        {
+            a += Mathf.Abs(data[i]);
+        }
+        /*
+                foreach (float sample in data)
+                {
+                    a += Mathf.Abs(sample);
+                }
+        */
+
+        return (a / amountSamples) * sensitivity * (sourceVolume / 100);
+
     }
 
     float GetAveragedVolume(float[] data)
@@ -819,7 +1007,7 @@ public class TomCatV3 : MonoBehaviour
                         : Random.Range((float)pitchFastBound.x, pitchFastBound.y);
                 }
 
-                finished.time = 0;
+                finished.timeSamples = 0;
                 finished.pitch = _randPitch;
                 break;
             case VoiceHandle.reversePlaying:
@@ -843,7 +1031,38 @@ public class TomCatV3 : MonoBehaviour
                 finished.time = finished.clip.length;
                 break;
             case VoiceHandle.withFunnyMoments:
-                
+                /*int timeSamples = 0;
+
+                int finishedLength = finished.clip.samples*finished.clip.channels;
+
+                print("Hello " + finishedLength);
+                _wordBegins = new List<int>();
+                _wordEndings = new List<int>();
+
+                /*finished.mute = false;
+                finished.loop = false;
+                finished.Play();
+                finished.timeSamples = 0;#1#
+                float loud = 0;
+
+                do
+                {
+                    loud = GetAverageLoudnessOnRange(ref timeSamples);
+                    if (!_word && loud > wordStartTreshold)
+                    {
+                        _wordBegins.Add(timeSamples);
+                        _word = true;
+                    }
+
+                    if (_word && loud < wordEndTreshold)
+                    {
+                        _wordEndings.Add(timeSamples);
+                        _word = false;
+                    }
+
+                    timeSamples += amountSamples;
+//                    finished.timeSamples = timeSamples;
+                } while (timeSamples <= finishedLength);*/
 
                 break;
         }
@@ -893,20 +1112,20 @@ public class TomCatV3 : MonoBehaviour
 
     private void _PlayFunnyMoment()
     {
-        _finishedTimeStop = finished.time;
+        _finishedTimeStop = finished.timeSamples;
         finished.Stop();
         funnyMoment.clip = funnyMoments[Random.Range(0, funnyMoments.Count)];
         /*_wordTime = wordTime + funnyMoment.clip.length;
         print(_wordTime);*/
-        _nextWord = true;
+        //        _nextWord = true;
         funnyMoment.Play();
     }
 
     private void _ContinueFinishedClip()
     {
-        _funnyMomentTime = false;
+        //        _funnyMomentTime = false;
         finished.Play();
-        finished.time = _finishedTimeStop;
+        finished.timeSamples = _finishedTimeStop;
     }
 
     /*public void PlayFunnyMoment()
@@ -958,4 +1177,34 @@ public class TomCatV3 : MonoBehaviour
 
         _averageLoudness = sumOfSamples / avLoud.Length;
     }*/
+
+    float GetAverageLoudnessOnRange(ref int timeSamples)
+    {
+        print(timeSamples);
+
+        float [] data = new float[amountSamples];
+
+        finished.clip.GetData(data, timeSamples);
+
+        float a = 0;
+
+        for (int i = 0; i < data.Length; i++)
+        {
+            a += Mathf.Abs(data[i]);
+        }
+/*
+        foreach (float sample in data)
+        {
+            a += Mathf.Abs(sample);
+        }
+*/
+
+        return (a / amountSamples) * sensitivity * (sourceVolume / 100);
+    }
+
+    public void PlayFinished()
+    {
+        finished.Play();
+        finished.timeSamples = finishedFrom;
+    }
 }
