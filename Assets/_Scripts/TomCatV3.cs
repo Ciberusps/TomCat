@@ -56,6 +56,7 @@ public class TomCatV3 : MonoBehaviour
     public float funnyMomentTime = 0.1F;
     public float wordTime = 0.25F;
     public float notEndWordTime = 0.07F;
+    public float notStartWordTime = 0.03F;
     public float wordStartTreshold = 3F;
     public float wordEndTreshold = 3F;
     public bool onlyFunnyVoice = true;
@@ -82,7 +83,7 @@ public class TomCatV3 : MonoBehaviour
     private AudioClip _avLoudness;
     private bool _recordVoice = false;
     private float _loudness;
-    private int amountSamples = 820/*1378*/; //increase to get better average, but will decrease performance. Best to leave it
+    private int amountSamples =/*256*/ 820/*1378*/; //increase to get better average, but will decrease performance. Best to leave it
     private string _MicroLogString;
     private string _RecordLogString;
     private string _TreasholdsString;
@@ -115,7 +116,9 @@ public class TomCatV3 : MonoBehaviour
     private bool _word = false;
     private float _notEndWordTimer = 0;
     private bool _nextWord = false;
-
+    private float _maxLoudness;
+    private float _notStartWordTimer;
+    
     public List<int> _wordBegins;
     public List<int> _wordEndings;
 
@@ -157,9 +160,14 @@ public class TomCatV3 : MonoBehaviour
 
 
         if (!_recordVoice)
-            micro.volume = (sourceVolume / 100);
+        {
+            micro.volume = (sourceVolume/100);
+        }
         else
+        {
             voice.volume = (sourceVolume / 100);
+            funnyMoment.volume = sourceVolume/100;
+        }
 
         _loudness = GetAveragedVolume();
 
@@ -274,7 +282,7 @@ public class TomCatV3 : MonoBehaviour
                         {
                             _notEndWordTimer = 0;
                             _word = false;
-                            _PlayFunnyMoment();
+                            _PlayFunnyMoment(); 
                         }
                     }
                     else
@@ -374,18 +382,50 @@ public class TomCatV3 : MonoBehaviour
 
                 if (_recordIsPlaying)
                 {
-                    if (!_word && _loudness > wordStartTreshold)
+                    if (_loudness > _maxLoudness)
                     {
-                        _wordBegins.Add(finished.timeSamples);
-                        _word = true;
+                        _maxLoudness = _loudness;
                     }
 
-                    if (_word && _loudness < wordEndTreshold)
+                    if (finished.isPlaying)
                     {
-                        _wordEndings.Add(finished.timeSamples);
-                        _word = false;
-                        _PlayFunnyMoment();
+                        if (!_word && _loudness > wordStartTreshold)
+                        {
+                            _wordBegins.Add(finished.timeSamples);
+                            _word = true;
+                        }
+
+                        if (_word && _loudness < wordEndTreshold)
+                        {
+                            _notEndWordTimer += Time.fixedDeltaTime;
+                            //                        print(_notEndWordTimer);
+
+                            if (_notEndWordTimer >= notEndWordTime)
+                            {
+                                _notEndWordTimer = 0;
+                                _word = false;
+                                _wordEndings.Add(finished.timeSamples);
+                                _PlayFunnyMoment();
+                            }
+                            /*_word = false;
+                            _wordEndings.Add(finished.timeSamples);
+                            _PlayFunnyMoment();*/
+                        }
+                        else if (_word && _loudness > wordStartTreshold)
+                        {
+                            _notStartWordTimer += Time.fixedDeltaTime;
+
+                            if (_notStartWordTimer >= _notStartWordTimer)
+                            {
+                                _notStartWordTimer = 0;
+                                _notEndWordTimer = 0;
+                            }
+                        }
+
+                        visualization.color = Color.green;
                     }
+                    else if (funnyMoment.isPlaying)
+                        visualization.color = Color.cyan;
 
                     if (!_word && !funnyMoment.isPlaying && !finished.isPlaying)
                     {
@@ -398,8 +438,12 @@ public class TomCatV3 : MonoBehaviour
                         _finishedTimeStop = 0;
                         finished.timeSamples = _finishedTimeStop;
                         _recordIsPlaying = false;
+                        print(_maxLoudness);
+                        _maxLoudness = 0;
+                        visualization.color = Color.white;
                     }
                 }
+
 
                 if (!_recordIsPlaying && inputVoice == InputVoice.onUpdate)
                     if (recordType == Record.withSamples)
@@ -820,6 +864,7 @@ public class TomCatV3 : MonoBehaviour
                     finished.pitch = 1F;
                     break;
             }
+//            SavWav.Save(DateTime.Now.Minute.ToString() + "-" + DateTime.Now.Second.ToString(), finished.clip);
         }
     }
 
@@ -895,9 +940,15 @@ public class TomCatV3 : MonoBehaviour
         float[] data = new float[amountSamples];
 
         if (finished.isPlaying)
+        {
             finished.GetOutputData(data, 0);
+//            print("Finis");
+        }
         else if (micro.isPlaying)
+        {
             micro.GetOutputData(data, 0);
+//            print("Micro");
+        }
 
         float a = 0;
 
@@ -911,7 +962,6 @@ public class TomCatV3 : MonoBehaviour
                     a += Mathf.Abs(sample);
                 }
         */
-
         return (a / amountSamples) * sensitivity * (sourceVolume / 100);
 
     }
@@ -1198,13 +1248,17 @@ public class TomCatV3 : MonoBehaviour
             a += Mathf.Abs(sample);
         }
 */
-
         return (a / amountSamples) * sensitivity * (sourceVolume / 100);
     }
 
-    public void PlayFinished()
+    /*public void PlayFinished()
     {
         finished.Play();
         finished.timeSamples = finishedFrom;
+    }*/
+
+    public void ChangeNotEndWordTime(UIInput input)
+    {
+        notEndWordTime = int.Parse(input.value);
     }
 }
